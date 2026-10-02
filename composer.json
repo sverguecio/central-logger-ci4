@@ -1,5 +1,5 @@
 {
-    "name": "tu-organizacion/central-logger-ci4",
+    "name": sverguecio/central-logger-ci4",
     "description": "Librería de logs centralizados para CodeIgniter 4 que intercepta eventos críticos y los envía a un servicio centralizado vía HTTP",
     "type": "library",
     "license": "MIT",
