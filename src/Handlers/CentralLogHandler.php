@@ -3,37 +3,15 @@
 namespace TuOrganizacion\CentralLogger\Handlers;
 
 use CodeIgniter\Log\Handlers\BaseHandler;
-use TuOrganizacion\CentralLogger\Config\CentralLogger;
 use Config\Services;
 use Throwable;
+use TuOrganizacion\CentralLogger\Config\CentralLogger;
 
-/**
- * Handler Centralizado de Logs para CodeIgniter 4
- * 
- * Intercepta logs de nivel crítico o superior y los envía mediante
- * HTTP POST a un servicio centralizado usando CURLRequest nativo.
- */
 class CentralLogHandler extends BaseHandler
 {
-    /**
-     * Instancia de configuración del logger
-     * 
-     * @var CentralLogger
-     */
     protected CentralLogger $config;
-
-    /**
-     * Niveles considerados críticos que siempre deben enviarse
-     * 
-     * @var array<string>
-     */
     protected array $criticalLevels = ['emergency', 'alert', 'critical'];
 
-    /**
-     * Constructor
-     * 
-     * @param array $config Configuración opcional del handler
-     */
     public function __construct(array $config = [])
     {
         parent::__construct($config);
@@ -45,116 +23,297 @@ class CentralLogHandler extends BaseHandler
         }
     }
 
-    /**
-     * Maneja un evento de log y lo envía al servicio centralizado
-     * 
-     * @param string $level Nivel del log (emergency, alert, critical, error, etc.)
-     * @param string $message Mensaje del log
-     * @return bool true si se envió correctamente, false en caso contrario
-     */
     public function handle($level, $message): bool
     {
-        $level = strtolower($level);
+        $level = strtolower((string) $level);
 
-        // Verificar si la configuración es válida
-        if (!$this->config->isValid()) {
+        if (!$this->shouldSendLevel($level)) {
             return false;
         }
 
-        // Verificar si el nivel debe ser manejado según threshold o si es crítico
-        if (!$this->config->shouldHandle($level) && !in_array($level, $this->criticalLevels, true)) {
-            return false;
-        }
-
-        // Construir el payload estructurado
         $payload = $this->buildPayload($level, $message);
+        $sent = $this->sendToApi($payload);
 
-        // Enviar al servicio centralizado
-        return $this->sendToApi($payload);
-    }
-
-    /**
-     * Construye el payload JSON con toda la información del log
-     * 
-     * @param string $level Nivel del log
-     * @param string $message Mensaje del log
-     * @return array
-     */
-    protected function buildPayload(string $level, string $message): array
-    {
-        return [
-            'app_name'    => $this->config->appName,
-            'environment' => $this->config->environment,
-            'level'       => strtoupper($level),
-            'message'     => $message,
-            'timestamp'   => date('c'), // ISO 8601
-            'ip'          => $_SERVER['REMOTE_ADDR'] ?? null,
-            'uri'         => $_SERVER['REQUEST_URI'] ?? null,
-            'user_agent'  => $_SERVER['HTTP_USER_AGENT'] ?? null,
-            'method'      => $_SERVER['REQUEST_METHOD'] ?? null,
-            'server_name' => gethostname(),
-        ];
-    }
-
-    /**
-     * Envía el payload al servicio centralizado mediante HTTP POST
-     * 
-     * @param array $payload Datos a enviar
-     * @return bool true si la petición fue exitosa (2xx), false en caso contrario
-     */
-    protected function sendToApi(array $payload): bool
-    {
-        try {
-            // Instanciar el cliente CURL nativo de CodeIgniter
-            $client = Services::curlrequest([
-                'timeout'     => $this->config->timeout,
-                'http_errors' => false, // No lanzar excepciones por códigos HTTP
-                'verify'      => ENVIRONMENT === 'production', // SSL solo en producción
-            ]);
-
-            // Preparar headers
-            $headers = [
-                'Content-Type' => 'application/json',
-                'Accept'       => 'application/json',
-                'X-Api-Key'    => $this->config->apiKey,
-            ];
-
-            // Realizar la petición POST
-            $response = $client->post($this->config->apiUrl, [
-                'headers' => $headers,
-                'json'    => $payload,
-            ]);
-
-            // Verificar código de respuesta
-            $statusCode = $response->getStatusCode();
-            
-            return $statusCode >= 200 && $statusCode < 300;
-
-        } catch (Throwable $e) {
-            // CRÍTICO: Nunca permitir que un fallo en el servicio central
-            // interrumpa la ejecución de la aplicación cliente.
-            // Solo registrar internamente si hay un logger de fallback disponible.
-            
-            // Opcionalmente se puede loguear el error localmente
-            if (function_exists('log_message')) {
-                log_message('error', 'CentralLogHandler falló al enviar log: ' . $e->getMessage());
+        if (!$sent) {
+            if ($this->config->queueEnabled) {
+                $this->enqueueFailedLog($payload);
             }
 
             return false;
         }
+
+        $this->flushQueue();
+
+        return true;
     }
 
-    /**
-     * Determina si este handler puede manejar el nivel dado
-     * 
-     * @param string $level Nivel del log
-     * @return bool
-     */
+    public function flushQueue(): int
+    {
+        if (!$this->config->queueEnabled) {
+            return 0;
+        }
+
+        $queuePath = $this->config->queuePath;
+
+        if (!is_file($queuePath)) {
+            return 0;
+        }
+
+        $content = @file_get_contents($queuePath);
+
+        if ($content === false || trim($content) === '') {
+            @unlink($queuePath);
+            return 0;
+        }
+
+        $items = json_decode($content, true);
+
+        if (!is_array($items)) {
+            @unlink($queuePath);
+            return 0;
+        }
+
+        $processed = 0;
+
+        foreach ($items as $item) {
+            $payload = $item['payload'] ?? null;
+
+            if (!is_array($payload)) {
+                continue;
+            }
+
+            if ($this->sendToApi($payload, false)) {
+                $processed++;
+            } else {
+                break;
+            }
+        }
+
+        if ($processed > 0) {
+            $remaining = $this->readQueue();
+
+            if (!empty($remaining)) {
+                $this->writeQueue($remaining);
+            } else {
+                @unlink($queuePath);
+            }
+        }
+
+        return $processed;
+    }
+
+    protected function shouldSendLevel(string $level): bool
+    {
+        if ($level === '') {
+            return false;
+        }
+
+        if (!$this->config->isValid()) {
+            return false;
+        }
+
+        return $this->config->shouldHandle($level)
+            || in_array($level, $this->criticalLevels, true);
+    }
+
+    protected function buildPayload(string $level, string $message): array
+    {
+        $caller = $this->resolveCallerInfo();
+
+        return [
+            'app_name'     => $this->config->appName,
+            'environment'  => $this->config->environment,
+            'level'        => strtoupper($level),
+            'message'      => (string) $message,
+            'timestamp'    => date('c'),
+            'ip'           => $this->getServerValue('REMOTE_ADDR'),
+            'uri'          => $this->getServerValue('REQUEST_URI'),
+            'user_agent'   => $this->getServerValue('HTTP_USER_AGENT'),
+            'method'       => $this->getServerValue('REQUEST_METHOD'),
+            'server_name'  => gethostname() ?: php_uname('n'),
+            'request_id'   => $this->getServerValue('HTTP_X_REQUEST_ID')
+                ?? $this->getServerValue('UNIQUE_ID')
+                ?? null,
+            'php_sapi'     => php_sapi_name(),
+            'file'         => $caller['file'] ?? null,
+            'line'         => $caller['line'] ?? null,
+            'class'        => $caller['class'] ?? null,
+            'function'     => $caller['function'] ?? null,
+        ];
+    }
+
+    protected function sendToApi(array $payload, bool $logWarnings = true): bool
+    {
+        $maxAttempts = max(1, $this->config->maxRetries + 1);
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            try {
+                $client = Services::curlrequest([
+                    'timeout'     => $this->config->timeout,
+                    'http_errors' => false,
+                    'verify'      => ENVIRONMENT === 'production',
+                ]);
+
+                $response = $client->post($this->config->apiUrl, [
+                    'headers' => [
+                        'Content-Type' => 'application/json',
+                        'Accept'       => 'application/json',
+                        'X-Api-Key'    => $this->config->apiKey,
+                    ],
+                    'json' => $payload,
+                ]);
+
+                $statusCode = $response->getStatusCode();
+
+                if ($statusCode >= 200 && $statusCode < 300) {
+                    return true;
+                }
+
+                $body = (string) $response->getBody();
+
+                if ($logWarnings && function_exists('log_message')) {
+                    log_message('warning', sprintf(
+                        'Central logger respondió con %s. Body: %s',
+                        $statusCode,
+                        $body ?: 'sin cuerpo'
+                    ));
+                }
+
+                if ($attempt >= $maxAttempts) {
+                    return false;
+                }
+
+                $this->waitBeforeRetry($attempt);
+
+            } catch (Throwable $e) {
+                if ($logWarnings && function_exists('log_message')) {
+                    log_message('error', 'CentralLogHandler falló al enviar log: ' . $e->getMessage());
+                }
+
+                if ($attempt >= $maxAttempts) {
+                    return false;
+                }
+
+                $this->waitBeforeRetry($attempt);
+            }
+        }
+
+        return false;
+    }
+
+    protected function enqueueFailedLog(array $payload): void
+    {
+        $queuePath = $this->config->queuePath;
+        $dir = dirname($queuePath);
+
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+
+        $items = $this->readQueue();
+
+        $items[] = [
+            'timestamp' => date('c'),
+            'payload'   => $payload,
+        ];
+
+        if (count($items) > $this->config->queueMaxSize) {
+            $items = array_slice($items, -$this->config->queueMaxSize);
+        }
+
+        $this->writeQueue($items);
+    }
+
+    protected function readQueue(): array
+    {
+        $queuePath = $this->config->queuePath;
+
+        if (!is_file($queuePath)) {
+            return [];
+        }
+
+        $content = @file_get_contents($queuePath);
+
+        if ($content === false || trim($content) === '') {
+            @unlink($queuePath);
+            return [];
+        }
+
+        $decoded = json_decode($content, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    protected function writeQueue(array $items): void
+    {
+        $queuePath = $this->config->queuePath;
+        $dir = dirname($queuePath);
+
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+
+        $json = json_encode($items, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+
+        if ($json === false) {
+            return;
+        }
+
+        @file_put_contents($queuePath, $json, LOCK_EX);
+    }
+
+    protected function waitBeforeRetry(int $attempt): void
+    {
+        $sleepMicroseconds = min(500000 * $attempt, 2000000);
+        usleep($sleepMicroseconds);
+    }
+
+    protected function getServerValue(string $key): ?string
+    {
+        if (!isset($_SERVER[$key])) {
+            return null;
+        }
+
+        $value = $_SERVER[$key];
+
+        if ($value === '' || $value === null) {
+            return null;
+        }
+
+        return (string) $value;
+    }
+
+    protected function resolveCallerInfo(): array
+    {
+        $trace = debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT | DEBUG_BACKTRACE_IGNORE_ARGS, 12);
+
+        foreach ($trace as $frame) {
+            $class = $frame['class'] ?? null;
+            $function = $frame['function'] ?? null;
+            $file = $frame['file'] ?? null;
+            $line = $frame['line'] ?? null;
+
+            if ($class === self::class || $function === 'log_message') {
+                continue;
+            }
+
+            if ($file !== null && $line !== null) {
+                return [
+                    'file'     => $file,
+                    'line'     => $line,
+                    'class'    => $class,
+                    'function' => $function,
+                ];
+            }
+        }
+
+        return [];
+    }
+
     public function canHandle(string $level): bool
     {
-        $level = strtolower($level);
-        
-        return $this->config->shouldHandle($level) 
-            || in_array($level, $this->criticalLevels, true);
+        $level = strtolower((string) $level);
+
+        return $this->shouldSendLevel($level);
     }
 }
