@@ -4,67 +4,75 @@
 [![CodeIgniter](https://img.shields.io/badge/CodeIgniter-4.x-orange.svg)](https://codeigniter.com)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-Librería modular de **logging centralizado** para CodeIgniter 4 que intercepta logs críticos y los envía a un servicio externo mediante HTTP POST, usando exclusivamente el cliente nativo `CURLRequest` de CodeIgniter.
+Librería de logging centralizado para CodeIgniter 4 que intercepta logs de nivel crítico y los envía a un servicio externo mediante HTTP POST, usando el cliente nativo de CodeIgniter (`curlrequest`).
 
-## 🎯 Características
+Incluye además:
+- reintentos automáticos
+- manejo fail-safe
+- queue local para eventos no enviados
+- contexto extendido del log (archivo, línea, clase, función, request_id, etc.)
 
-- ✅ **Zero dependencias externas** - Solo usa componentes nativos de CodeIgniter 4
-- ✅ **Configuración flexible** - Soporta variables de entorno y archivos de configuración
-- ✅ **Fail-safe** - Nunca interrumpe la ejecución de la aplicación cliente si el servicio centralizado falla
-- ✅ **Threshold configurable** - Define qué niveles de log enviar (por defecto: critical y superiores)
-- ✅ **Timeout corto** - Peticiones rápidas (2s por defecto) para no bloquear la app
-- ✅ **Rico en contexto** - Envía IP, URI, user agent, método HTTP, hostname, etc.
-- ✅ **PSR-4 Autoload** - Instalación simple vía Composer
+## Características
+
+- ✅ Zero dependencias externas
+- ✅ Configuración por variables de entorno
+- ✅ Threshold configurable
+- ✅ Reintentos con backoff
+- ✅ Cola local para persistencia ante fallas
+- ✅ Fail-safe: no rompe la ejecución de la app si el backend central falla
+- ✅ Contexto útil para diagnóstico
+- ✅ Autoload PSR-4
 
 ---
 
-## 📦 Instalación
+## Instalación
 
-### Via Composer (Recomendado)
+### Opción 1: Composer (recomendada)
 
 ```bash
-composer require tu-organizacion/central-logger-ci4
+composer require sverguecio/central-logger-ci4
 ```
 
-### Instalación manual
-
-Si tu repositorio es privado y usas un repositorio Composer personalizado:
+### Opción 2: Desde GitHub
 
 ```json
 {
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/tu-organizacion/central-logger-ci4.git"
-        }
-    ],
-    "require": {
-        "tu-organizacion/central-logger-ci4": "^1.0"
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/sverguecio/central-logger-ci4.git"
     }
+  ],
+  "require": {
+    "sverguecio/central-logger-ci4": "^1.1"
+  }
 }
 ```
 
 ---
 
-## ⚙️ Configuración
+## Configuración
 
-### 1. Variables de Entorno (`.env`)
+### 1. Variables de entorno (.env)
 
-Agrega las siguientes variables a tu archivo `.env`:
+Agrega estas variables a tu archivo `.env`:
 
 ```env
-# Central Logger Configuration
 CENTRAL_LOGGER_API_URL=https://api-logs.tudominio.com/api/logs
 CENTRAL_LOGGER_API_KEY=tu_token_secreto_aqui
 CENTRAL_LOGGER_APP_NAME=app-facturacion
 CENTRAL_LOGGER_ENVIRONMENT=production
 CENTRAL_LOGGER_TIMEOUT=2.0
 CENTRAL_LOGGER_THRESHOLD=critical
+CENTRAL_LOGGER_MAX_RETRIES=2
+CENTRAL_LOGGER_QUEUE_ENABLED=true
+CENTRAL_LOGGER_QUEUE_PATH=/path/to/writable/logs/central-logger-queue.json
+CENTRAL_LOGGER_QUEUE_MAX_SIZE=1000
 ```
 
-### 2. Configurar el Logger de CodeIgniter
+### 2. Configurar el logger de CodeIgniter
 
-Edita el archivo `app/Config/Logger.php` y agrega el handler:
+Edita `app/Config/Logger.php` y agrega el handler centralizado:
 
 ```php
 <?php
@@ -79,7 +87,6 @@ class Logger extends BaseConfig
     public $threshold = 4; // 4 = LogLevel::CRITICAL
 
     public $handlers = [
-        // Handler por defecto de archivos
         'CodeIgniter\Log\Handlers\FileHandler' => [
             'handles' => [
                 'critical',
@@ -93,7 +100,6 @@ class Logger extends BaseConfig
             ],
         ],
 
-        // Handler centralizado para logs críticos
         CentralLogHandler::class => [
             'handles' => [
                 'critical',
@@ -105,16 +111,9 @@ class Logger extends BaseConfig
 }
 ```
 
-### 3. Configuración Avanzada (Opcional)
+### 3. Configuración personalizada opcional
 
-Si prefieres no usar variables de entorno, puedes publicar y personalizar el archivo de configuración:
-
-```bash
-# Copia el archivo de configuración a tu app
-cp vendor/tu-organizacion/central-logger-ci4/src/Config/CentralLogger.php app/Config/
-```
-
-Luego edítalo directamente:
+Si querés sobrescribir valores programáticamente, podés extender la clase `CentralLogger`:
 
 ```php
 <?php
@@ -131,188 +130,190 @@ class CentralLogger extends BaseCentralLogger
     public string $environment = 'production';
     public float $timeout = 2.0;
     public string $threshold = 'critical';
+    public int $maxRetries = 2;
+    public bool $queueEnabled = true;
+    public int $queueMaxSize = 1000;
 }
 ```
 
 ---
 
-## 🚀 Uso
+## Uso
 
-Una vez configurado, el handler interceptará **automáticamente** todos los logs que cumplan el threshold:
+Una vez configurado, el handler intercepta automáticamente los logs que cumplan el threshold configurado:
 
 ```php
-<?php
-
-// Estos logs se enviarán al servicio centralizado
 log_message('emergency', 'Base de datos no disponible');
 log_message('alert', 'Memoria crítica alcanzada');
 log_message('critical', 'Archivo de configuración corrupto');
 
-// Estos NO se enviarán (por debajo del threshold 'critical')
+// Estos no se envían si el threshold es 'critical'
 log_message('error', 'Usuario no encontrado');
 log_message('warning', 'Cache expirado');
 log_message('info', 'Usuario inició sesión');
 ```
 
-### Ejemplo de Payload Enviado
+### Payload enviado al servicio central
 
 ```json
 {
-    "app_name": "app-facturacion",
-    "environment": "production",
-    "level": "CRITICAL",
-    "message": "Base de datos no disponible",
-    "timestamp": "2026-10-02T03:12:45+00:00",
-    "ip": "192.168.1.100",
-    "uri": "/api/invoices/create",
-    "user_agent": "Mozilla/5.0...",
-    "method": "POST",
-    "server_name": "web-server-01"
+  "app_name": "app-facturacion",
+  "environment": "production",
+  "level": "CRITICAL",
+  "message": "Base de datos no disponible",
+  "timestamp": "2026-10-02T03:12:45+00:00",
+  "ip": "192.168.1.100",
+  "uri": "/api/invoices/create",
+  "user_agent": "Mozilla/5.0...",
+  "method": "POST",
+  "server_name": "web-server-01",
+  "request_id": "abc123",
+  "php_sapi": "fpm-fcgi",
+  "file": "/var/www/app/Controllers/InvoiceController.php",
+  "line": 88,
+  "class": "App\\Controllers\\InvoiceController",
+  "function": "create"
 }
 ```
 
 ---
 
-## 🔒 Seguridad
+## Cola local
 
-### Headers de Autenticación
+Si el servicio central falla o no responde, el paquete guarda el evento en una cola local en `WRITEPATH/logs` o en la ruta configurada con `CENTRAL_LOGGER_QUEUE_PATH`.
 
-El handler envía la API Key en el header `X-Api-Key`:
+Esto permite:
+- no perder eventos en cortes de red
+- reintentar más adelante
+- recuperar el stream cuando el backend esté disponible otra vez
 
+Puedes forzar el flush manualmente:
+
+```php
+$handler = new \TuOrganizacion\CentralLogger\Handlers\CentralLogHandler();
+$handler->flushQueue();
 ```
+
+---
+
+## Seguridad
+
+### Headers
+
+El paquete envía la clave en el header `X-Api-Key`:
+
+```http
 POST /api/logs HTTP/1.1
 Host: api-logs.tudominio.com
 Content-Type: application/json
+Accept: application/json
 X-Api-Key: tu_token_secreto
 ```
 
-Si tu servicio centralizado usa `Authorization: Bearer`, modifica el método `sendToApi()` en `CentralLogHandler.php`:
+Si tu backend usa `Authorization: Bearer`, podés adaptar `CentralLogHandler.php`.
+
+### Timeout y fail-safe
+
+- timeout corto por defecto (2s)
+- reintentos configurables
+- no interrumpe la ejecución de la app si el backend cae
+- SSL verificado en producción
+
+---
+
+## Niveles soportados
+
+De mayor prioridad a menor:
+
+| Nivel | Valor | Descripción |
+|---|---:|---|
+| `emergency` | 1 | Sistema inutilizable |
+| `alert` | 2 | Acción inmediata requerida |
+| `critical` | 3 | Condición crítica |
+| `error` | 4 | Error no crítico |
+| `warning` | 5 | Advertencia |
+| `notice` | 6 | Evento relevante |
+| `info` | 7 | Información general |
+| `debug` | 8 | Depuración |
+
+---
+
+## Testing
+
+Para probar la integración sin enviar logs reales:
+
+1. Usá un endpoint de prueba como webhook.site
+2. Configurá `.env` con esa URL
+3. Ejecutá un log:
 
 ```php
-$headers = [
-    'Content-Type'  => 'application/json',
-    'Authorization' => 'Bearer ' . $this->config->apiKey,
-];
+log_message('critical', 'Test de integración con central logger');
 ```
 
-### Timeout y Fail-Safe
-
-- **Timeout corto (2s)**: Evita bloquear la aplicación si el servicio central está lento
-- **Try/catch global**: Captura cualquier excepción (red caída, DNS error, timeout) y retorna `false` sin afectar la app
-- **SSL Verification**: Activo en `production`, desactivado en `development` para pruebas locales
+4. Verificá el payload recibido en el endpoint de prueba
 
 ---
 
-## 📊 Niveles de Log Soportados
-
-De mayor a menor prioridad:
-
-| Nivel       | Valor | Descripción                          |
-|-------------|-------|--------------------------------------|
-| `emergency` | 1     | Sistema inutilizable                 |
-| `alert`     | 2     | Acción inmediata requerida           |
-| `critical`  | 3     | Condición crítica (default threshold)|
-| `error`     | 4     | Error que no requiere acción inmediata|
-| `warning`   | 5     | Advertencia                          |
-| `notice`    | 6     | Evento normal pero significativo     |
-| `info`      | 7     | Información general                  |
-| `debug`     | 8     | Información de depuración            |
-
----
-
-## 🧪 Testing
-
-Para probar la librería sin enviar logs reales:
-
-1. Usa un endpoint de prueba como [webhook.site](https://webhook.site)
-2. Configura la URL en tu `.env`:
-
-```env
-CENTRAL_LOGGER_API_URL=https://webhook.site/tu-uuid-unico
-CENTRAL_LOGGER_API_KEY=test-key
-CENTRAL_LOGGER_APP_NAME=app-test
-CENTRAL_LOGGER_THRESHOLD=debug
-```
-
-3. Ejecuta un log de prueba:
-
-```php
-log_message('critical', 'Test de integración con el servicio centralizado');
-```
-
-4. Verifica en webhook.site que llegó el payload JSON
-
----
-
-## 🛠️ Troubleshooting
+## Troubleshooting
 
 ### Los logs no se envían
 
-1. **Verifica las variables de entorno**:
-   ```bash
-   php spark env:show CENTRAL_LOGGER_API_URL
-   ```
+Verificá:
 
-2. **Verifica que el handler está registrado**:
-   ```php
-   var_dump(config('Logger')->handlers);
-   ```
+```bash
+php spark env:show CENTRAL_LOGGER_API_URL
+php spark env:show CENTRAL_LOGGER_API_KEY
+php spark env:show CENTRAL_LOGGER_THRESHOLD
+```
 
-3. **Revisa los logs locales**:
-   ```bash
-   tail -f writable/logs/log-*.log
-   ```
+Y confirmá que el handler está registrado en `app/Config/Logger.php`.
+
+### Revisar la cola
+
+Si el servicio central estaba caído, revisá:
+
+```bash
+ls writable/logs
+cat writable/logs/central-logger-queue.json
+```
 
 ### Timeout muy largo
-
-Si tus peticiones tardan más de 2 segundos, ajusta el timeout:
 
 ```env
 CENTRAL_LOGGER_TIMEOUT=5.0
 ```
 
-### Errores SSL en desarrollo local
+---
 
-Desactiva la verificación SSL editando `CentralLogHandler.php`:
+## Licencia
 
-```php
-$client = Services::curlrequest([
-    'timeout' => $this->config->timeout,
-    'verify'  => false, // Solo para desarrollo
-]);
-```
+Este paquete está bajo la licencia MIT. Ver `LICENSE`.
 
 ---
 
-## 📝 Licencia
+## Contribuciones
 
-Este paquete está licenciado bajo la [Licencia MIT](LICENSE).
-
----
-
-## 👥 Contribución
-
-1. Fork el repositorio
-2. Crea una rama para tu feature (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit tus cambios (`git commit -am 'Agrega nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Crea un Pull Request
+1. Fork del repositorio
+2. Crear una rama (`git checkout -b feature/nueva-funcionalidad`)
+3. Hacer commit y push
+4. Abrir Pull Request
 
 ---
 
-## 📧 Soporte
+## Soporte
 
-Para reportar bugs o solicitar features, abre un issue en el repositorio:
-
-**GitHub**: [tu-organizacion/central-logger-ci4/issues](https://github.com/tu-organizacion/central-logger-ci4/issues)
+Para reportar bugs o feature requests, abrí un issue en GitHub.
 
 ---
 
-## 🙏 Créditos
+## Compatibilidad
 
-Desarrollado por **Tu Organización** para ecosistemas CodeIgniter 4 empresariales.
-
-**Compatibilidad**:
 - PHP: >= 8.1
-- CodeIgniter: >= 4.0
-- cURL extension requerida
+- CodeIgniter 4.x
+- cURL requerido
+
+---
+
+## Autor
+
+Sebastian Verguecio
