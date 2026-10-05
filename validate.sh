@@ -5,8 +5,14 @@
 
 set -e
 
+PACKAGE_NAME="sverguecio/central-logger-ci4"
+EXPECTED_PHP=">=8.0"
+EXPECTED_VERSION="1.1.0"
+
 echo "=========================================="
 echo "🔍 Validando paquete Central Logger CI4"
+echo "   Paquete: $PACKAGE_NAME"
+echo "   Versión esperada en CHANGELOG: $EXPECTED_VERSION"
 echo "=========================================="
 echo ""
 
@@ -62,13 +68,13 @@ echo "----------------------------------------"
 
 # Verificar sintaxis de archivos PHP (solo si PHP está disponible)
 if command -v php &> /dev/null; then
-    for file in src/**/*.php; do
+    while IFS= read -r file; do
         if php -l "$file" > /dev/null 2>&1; then
             success "Sintaxis correcta: $file"
         else
             error "Sintaxis incorrecta: $file"
         fi
-    done
+    done < <(find src -type f -name '*.php' | sort)
 else
     warning "PHP no disponible - omitiendo validación de sintaxis"
 fi
@@ -79,20 +85,21 @@ echo "----------------------------------------"
 
 # Verificar que composer.json es válido (solo si composer está disponible)
 if command -v composer &> /dev/null; then
-    if composer validate --no-check-all --strict 2>&1 | grep -q "is valid"; then
-        success "composer.json es válido"
+    if composer validate --strict > /dev/null 2>&1; then
+        success "composer.json es válido (composer validate --strict)"
     else
         error "composer.json tiene errores"
+        composer validate --strict 2>&1 | sed 's/^/    /'
     fi
 else
     warning "Composer no disponible - omitiendo validación de composer.json"
 fi
 
 # Verificar campos importantes en composer.json
-if grep -q '"name": "tu-organizacion/central-logger-ci4"' composer.json; then
-    success "Campo 'name' encontrado en composer.json"
+if grep -q "\"name\": \"$PACKAGE_NAME\"" composer.json; then
+    success "Campo 'name' es '$PACKAGE_NAME'"
 else
-    error "Campo 'name' incorrecto o faltante en composer.json"
+    error "Campo 'name' incorrecto o faltante en composer.json (se esperaba '$PACKAGE_NAME')"
 fi
 
 if grep -q '"type": "library"' composer.json; then
@@ -101,10 +108,23 @@ else
     warning "Campo 'type' debería ser 'library'"
 fi
 
-if grep -q '"php": ">=8.1"' composer.json; then
-    success "Requiere PHP >= 8.1"
+if grep -q "\"php\": \"$EXPECTED_PHP\"" composer.json; then
+    success "Requiere PHP $EXPECTED_PHP"
 else
-    warning "Versión de PHP no especificada correctamente"
+    error "Requisito de PHP inconsistente en composer.json (se esperaba '$EXPECTED_PHP')"
+fi
+
+# El badge del README debe coincidir con el requisito de composer.json
+if grep -q "badge/php-%3E%3D${EXPECTED_PHP#>=}-" README.md; then
+    success "Badge de PHP en README.md coincide con composer.json"
+else
+    error "Badge de PHP en README.md no coincide con $EXPECTED_PHP"
+fi
+
+if grep -q "PHP: ${EXPECTED_PHP/>=/>= }" README.md; then
+    success "Sección de compatibilidad de README.md coincide con composer.json"
+else
+    error "Sección de compatibilidad de README.md no coincide con $EXPECTED_PHP"
 fi
 
 if grep -q '"codeigniter4/framework": "\^4.0"' composer.json; then
@@ -159,9 +179,19 @@ else
     error "Namespace incorrecto en CentralLogHandler.php"
 fi
 
+warning "El namespace PSR-4 sigue siendo 'TuOrganizacion\\CentralLogger\\' y no coincide con el nombre del paquete. Renombrarlo es un breaking change: queda diferido a 2.0.0 (ver CHANGELOG.md)."
+
 echo ""
 echo "6. Verificando documentación..."
 echo "----------------------------------------"
+
+# No deben quedar referencias al nombre antiguo del paquete ni al repo antiguo
+STALE=$(grep -rln "tu-organizacion/central-logger-ci4" --exclude-dir=.git --exclude=validate.sh . || true)
+if [ -z "$STALE" ]; then
+    success "Sin referencias al nombre de paquete antiguo"
+else
+    error "Referencias al nombre de paquete antiguo en: $(echo "$STALE" | tr '\n' ' ')"
+fi
 
 # Verificar README.md
 if [ -s README.md ]; then
@@ -182,10 +212,10 @@ fi
 
 # Verificar CHANGELOG.md
 if [ -s CHANGELOG.md ]; then
-    if grep -q "\[1.0.0\]" CHANGELOG.md; then
-        success "CHANGELOG.md tiene versión 1.0.0"
+    if grep -q "^## \[$EXPECTED_VERSION\]" CHANGELOG.md; then
+        success "CHANGELOG.md documenta la versión $EXPECTED_VERSION"
     else
-        warning "CHANGELOG.md sin versión 1.0.0"
+        error "CHANGELOG.md sin entrada para la versión $EXPECTED_VERSION"
     fi
 else
     error "CHANGELOG.md está vacío o no existe"
@@ -236,16 +266,41 @@ echo ""
 echo "9. Verificando .gitignore..."
 echo "----------------------------------------"
 
-if grep -q "vendor/" .gitignore; then
-    success ".gitignore excluye vendor/"
+if [ -f .gitignore ]; then
+    if grep -q "vendor/" .gitignore; then
+        success ".gitignore excluye vendor/"
+    else
+        error ".gitignore no excluye vendor/"
+    fi
+
+    if grep -q "^\.env$" .gitignore; then
+        success ".gitignore excluye .env"
+    else
+        error ".gitignore no excluye .env"
+    fi
+
+    if grep -q "^composer.lock$" .gitignore; then
+        success ".gitignore excluye composer.lock (correcto para una librería)"
+    else
+        warning ".gitignore no excluye composer.lock"
+    fi
 else
-    warning ".gitignore no excluye vendor/"
+    error ".gitignore no existe"
 fi
 
-if grep -q ".env" .gitignore; then
-    success ".gitignore excluye .env"
-else
-    warning ".gitignore no excluye .env"
+# El paquete no debe versionar artefactos de instalación
+if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+    if git ls-files --error-unmatch composer.lock > /dev/null 2>&1; then
+        warning "composer.lock está versionado; en una librería conviene no publicarlo"
+    else
+        success "composer.lock no está versionado"
+    fi
+
+    if [ -n "$(git ls-files vendor/)" ]; then
+        error "vendor/ está versionado"
+    else
+        success "vendor/ no está versionado"
+    fi
 fi
 
 echo ""
