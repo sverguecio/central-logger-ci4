@@ -1,0 +1,28 @@
+# Dependencias instaladas por Composer
+/vendor/
+
+# composer.lock no se versiona en librerías: la app consumidora resuelve sus versiones
+composer.lock
+
+# Configuración local y secretos
+.env
+.env.local
+
+# Artefactos de test y herramientas
+/.phpunit.cache/
+.phpunit.result.cache
+/build/
+/coverage/
+clover.xml
+.php-cs-fixer.cache
+.phpstan.cache
+
+# Cola local generada en tiempo de ejecución
+central-logger-queue.json
+
+# Archivos de editor y sistema operativo
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
