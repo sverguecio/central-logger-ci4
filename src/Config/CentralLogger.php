@@ -4,62 +4,19 @@ namespace TuOrganizacion\CentralLogger\Config;
 
 use CodeIgniter\Config\BaseConfig;
 
-/**
- * Configuración para el Logger Centralizado
- * 
- * Esta clase define todos los parámetros necesarios para conectar
- * con el servicio centralizado de logs. Soporta variables de entorno.
- */
 class CentralLogger extends BaseConfig
 {
-    /**
-     * URL del endpoint POST del servicio centralizado de logs
-     * 
-     * @var string
-     */
     public string $apiUrl = '';
-
-    /**
-     * Token de autenticación para el servicio de logs
-     * 
-     * @var string
-     */
     public string $apiKey = '';
-
-    /**
-     * Nombre o identificador único de la aplicación cliente
-     * 
-     * @var string
-     */
     public string $appName = '';
-
-    /**
-     * Entorno de ejecución (production, staging, development, testing)
-     * 
-     * @var string
-     */
     public string $environment = '';
-
-    /**
-     * Timeout en segundos para la petición HTTP (debe ser corto)
-     * 
-     * @var float
-     */
     public float $timeout = 2.0;
-
-    /**
-     * Nivel mínimo de log a enviar al servicio central
-     * Valores posibles: emergency, alert, critical, error, warning, notice, info, debug
-     * 
-     * @var string
-     */
     public string $threshold = 'critical';
+    public int $maxRetries = 2;
+    public bool $queueEnabled = true;
+    public string $queuePath = '';
+    public int $queueMaxSize = 1000;
 
-    /**
-     * Mapeo de niveles de log a valores numéricos para comparación
-     * 
-     * @var array<string, int>
-     */
     protected array $logLevels = [
         'emergency' => 1,
         'alert'     => 2,
@@ -71,9 +28,6 @@ class CentralLogger extends BaseConfig
         'debug'     => 8,
     ];
 
-    /**
-     * Constructor - Carga valores desde variables de entorno
-     */
     public function __construct()
     {
         parent::__construct();
@@ -84,18 +38,16 @@ class CentralLogger extends BaseConfig
         $this->environment = env('CENTRAL_LOGGER_ENVIRONMENT', $this->environment ?: ENVIRONMENT);
         $this->timeout     = (float) env('CENTRAL_LOGGER_TIMEOUT', $this->timeout);
         $this->threshold   = env('CENTRAL_LOGGER_THRESHOLD', $this->threshold);
+        $this->maxRetries  = (int) env('CENTRAL_LOGGER_MAX_RETRIES', $this->maxRetries);
+        $this->queueEnabled = filter_var(env('CENTRAL_LOGGER_QUEUE_ENABLED', true), FILTER_VALIDATE_BOOLEAN);
+        $this->queuePath    = env('CENTRAL_LOGGER_QUEUE_PATH', WRITEPATH . 'logs' . DIRECTORY_SEPARATOR . 'central-logger-queue.json');
+        $this->queueMaxSize = (int) env('CENTRAL_LOGGER_QUEUE_MAX_SIZE', 1000);
     }
 
-    /**
-     * Verifica si un nivel dado debe ser enviado según el threshold configurado
-     * 
-     * @param string $level Nivel del log a verificar
-     * @return bool
-     */
     public function shouldHandle(string $level): bool
     {
-        $level     = strtolower($level);
-        $threshold = strtolower($this->threshold);
+        $level = strtolower(trim($level));
+        $threshold = strtolower(trim($this->threshold));
 
         if (!isset($this->logLevels[$level]) || !isset($this->logLevels[$threshold])) {
             return false;
@@ -104,16 +56,36 @@ class CentralLogger extends BaseConfig
         return $this->logLevels[$level] <= $this->logLevels[$threshold];
     }
 
-    /**
-     * Valida que la configuración esté completa y sea válida
-     * 
-     * @return bool
-     */
     public function isValid(): bool
     {
-        return !empty($this->apiUrl) 
-            && !empty($this->apiKey) 
-            && !empty($this->appName)
-            && !empty($this->environment);
+        if (empty($this->apiUrl) || !filter_var($this->apiUrl, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        if (empty($this->apiKey)) {
+            return false;
+        }
+
+        if (empty($this->appName)) {
+            return false;
+        }
+
+        if (empty($this->environment)) {
+            return false;
+        }
+
+        if ($this->timeout <= 0) {
+            return false;
+        }
+
+        if (!isset($this->logLevels[strtolower($this->threshold)])) {
+            return false;
+        }
+
+        if ($this->maxRetries < 0) {
+            return false;
+        }
+
+        return true;
     }
 }
