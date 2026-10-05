@@ -5,7 +5,7 @@
 ### 1. Instalar el paquete (1 minuto)
 
 ```bash
-composer require tu-organizacion/central-logger-ci4
+composer require sverguecio/central-logger-ci4
 ```
 
 ### 2. Configurar .env (2 minutos)
@@ -159,8 +159,8 @@ $client = Services::curlrequest([
 
 ### Test con Controlador de Prueba
 
-1. Copiar `vendor/tu-organizacion/central-logger-ci4/examples/TestCentralLogger.php` a `app/Controllers/`
-2. Copiar `vendor/tu-organizacion/central-logger-ci4/examples/test_central_logger.php` a `app/Views/`
+1. Copiar `vendor/sverguecio/central-logger-ci4/examples/TestCentralLogger.php` a `app/Controllers/`
+2. Copiar `vendor/sverguecio/central-logger-ci4/examples/test_central_logger.php` a `app/Views/`
 3. Acceder a `https://tu-app.local/test-central-logger`
 4. Ver resultados en pantalla
 5. **IMPORTANTE**: Eliminar ambos archivos después de probar
@@ -186,7 +186,7 @@ for APP in "${APPS[@]}"; do
     cd "$APP"
     
     # Instalar paquete
-    composer require tu-organizacion/central-logger-ci4 --no-interaction
+    composer require sverguecio/central-logger-ci4 --no-interaction
     
     # Agregar configuración al .env
     if ! grep -q "CENTRAL_LOGGER_API_URL" .env; then
@@ -213,12 +213,12 @@ echo "🎉 Instalación completada en ${#APPS[@]} aplicaciones"
 
 ### Verificar instalación
 ```bash
-composer show tu-organizacion/central-logger-ci4
+composer show sverguecio/central-logger-ci4
 ```
 
 ### Actualizar a última versión
 ```bash
-composer update tu-organizacion/central-logger-ci4
+composer update sverguecio/central-logger-ci4
 ```
 
 ### Ver logs locales en tiempo real
@@ -299,7 +299,7 @@ log_message('critical', sprintf(
 
 ```bash
 # 1. Instalar
-composer require tu-organizacion/central-logger-ci4
+composer require sverguecio/central-logger-ci4
 
 # 2. Configurar .env
 echo "CENTRAL_LOGGER_API_URL=https://api-logs.tudominio.com/api/logs" >> .env
@@ -318,5 +318,5 @@ echo "CENTRAL_LOGGER_APP_NAME=nombre-app" >> .env
 ---
 
 **Documentación actualizada**: Octubre 2, 2026  
-**Versión del paquete**: 1.0.0  
-**Soporte**: https://github.com/tu-organizacion/central-logger-ci4/issues
+**Versión del paquete**: 1.1.0  
+**Soporte**: https://github.com/sverguecio/central-logger-ci4/issues

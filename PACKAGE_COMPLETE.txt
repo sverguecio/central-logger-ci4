@@ -25,10 +25,10 @@
 
   PAQUETE COMPLETO Y LISTO PARA USAR
   
-  Versión: 1.0.0
-  Fecha: Octubre 2, 2026
+  Versión: 1.1.0
+  Fecha: Octubre 5, 2026
   Licencia: MIT
-  PHP: >= 8.1
+  PHP: >= 8.0
   CodeIgniter: >= 4.0
   
 ═══════════════════════════════════════════════════════════════════════════════
@@ -132,7 +132,7 @@
 ═══════════════════════════════════════════════════════════════════════════════
 
   1. Instalar el paquete:
-     composer require tu-organizacion/central-logger-ci4
+     composer require sverguecio/central-logger-ci4
 
   2. Configurar .env:
      CENTRAL_LOGGER_API_URL=https://api-logs.tudominio.com/api/logs
@@ -184,7 +184,7 @@
   Para Publicar:
     1. Lee PUBLISHING_GUIDE.md
     2. Inicializar Git y hacer push
-    3. Crear tag v1.0.0
+    3. Crear tag v1.1.0
     4. Configurar acceso vía Composer
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -208,14 +208,13 @@
 ═══════════════════════════════════════════════════════════════════════════════
 
   Documentación: INDEX.md
-  GitHub Issues: (tu-organizacion/central-logger-ci4/issues)
-  Email: dev@tu-organizacion.com
+  GitHub Issues: https://github.com/sverguecio/central-logger-ci4/issues
   
 ═══════════════════════════════════════════════════════════════════════════════
 
-  Desarrollado por: Tu Organización
-  Fecha: Octubre 2, 2026
-  Versión: 1.0.0
+  Desarrollado por: Sebastian Verguecio
+  Fecha: Octubre 5, 2026
+  Versión: 1.1.0
   Licencia: MIT
   
 ═══════════════════════════════════════════════════════════════════════════════

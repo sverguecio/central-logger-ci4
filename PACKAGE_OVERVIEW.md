@@ -178,7 +178,7 @@ Para cada aplicación:
 
 1. **Instalación**
    ```bash
-   composer require tu-organizacion/central-logger-ci4
+   composer require sverguecio/central-logger-ci4
    ```
 
 2. **Configuración de .env**

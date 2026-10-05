@@ -10,7 +10,7 @@ Esta guía te ayudará a integrar el Central Logger CI4 en tus 25 aplicaciones C
 
 ```bash
 cd /ruta/a/tu/aplicacion
-composer require tu-organizacion/central-logger-ci4
+composer require sverguecio/central-logger-ci4
 ```
 
 ### 2. Configurar variables de entorno
@@ -107,7 +107,7 @@ Accede a `https://tu-app.local/test-logger/test` y verifica que el log llegue al
 
 Para cada una de tus 25 aplicaciones:
 
-- [ ] Ejecutar `composer require tu-organizacion/central-logger-ci4`
+- [ ] Ejecutar `composer require sverguecio/central-logger-ci4`
 - [ ] Agregar variables de entorno al `.env`
 - [ ] Cambiar `CENTRAL_LOGGER_APP_NAME` por nombre único
 - [ ] Editar `app/Config/Logger.php` y registrar el handler
@@ -152,7 +152,7 @@ for APP_PATH in "${APPS[@]}"; do
     
     # 1. Instalar el paquete
     echo "📦 Instalando paquete..."
-    composer require tu-organizacion/central-logger-ci4 --no-interaction
+    composer require sverguecio/central-logger-ci4 --no-interaction
     
     # 2. Obtener el nombre de la app del directorio
     APP_NAME=$(basename "$APP_PATH")
@@ -271,7 +271,7 @@ CENTRAL_LOGGER_THRESHOLD=emergency  # Solo emergencias
 
 Si usas certificados auto-firmados, desactiva temporalmente la verificación SSL (solo desarrollo):
 
-Edita `vendor/tu-organizacion/central-logger-ci4/src/Handlers/CentralLogHandler.php`:
+Edita `vendor/sverguecio/central-logger-ci4/src/Handlers/CentralLogHandler.php`:
 
 ```php
 $client = Services::curlrequest([

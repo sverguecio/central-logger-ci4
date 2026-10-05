@@ -35,7 +35,7 @@
 - Timeout corto (2s) evita bloqueos
 
 ### 3. **Fácil Instalación**
-- 1 comando: `composer require tu-organizacion/central-logger-ci4`
+- 1 comando: `composer require sverguecio/central-logger-ci4`
 - 3 variables de entorno en `.env`
 - 5 minutos de configuración por aplicación
 
@@ -82,12 +82,12 @@ Cada log incluye:
 
 ### Fase 2: Publicación del Paquete (30 minutos)
 1. Push del repositorio a GitHub/GitLab privado
-2. Crear tag v1.0.0
+2. Crear tag v1.1.0
 3. Configurar acceso vía Composer
 
 ### Fase 3: Instalación en las 25 Apps (2-3 días)
 **Por cada aplicación (15 minutos)**:
-1. `composer require tu-organizacion/central-logger-ci4`
+1. `composer require sverguecio/central-logger-ci4`
 2. Configurar 3 variables en `.env`
 3. Registrar handler en `app/Config/Logger.php`
 4. Probar y verificar
@@ -287,4 +287,4 @@ R: Sí, pero implica costos mensuales y dependencia externa. Esta solución es g
 
 **Preparado por**: Equipo de Desarrollo  
 **Fecha**: Octubre 2, 2026  
-**Versión**: 1.0.0
+**Versión**: 1.1.0

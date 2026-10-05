@@ -188,8 +188,8 @@ central-logger-ci4/
 
 Ver [CHANGELOG.md](CHANGELOG.md) para el historial completo de versiones.
 
-**Versión Actual**: 1.0.0  
-**Fecha de Release**: Octubre 2, 2026
+**Versión Actual**: 1.1.0  
+**Fecha de Release**: Octubre 5, 2026
 
 ---
 
@@ -222,9 +222,7 @@ Ver **PUBLISHING_GUIDE.md** para más detalles.
 - **Troubleshooting**: [README.md#troubleshooting](README.md#-troubleshooting)
 
 ### Contacto
-- **GitHub Issues**: Para bugs y features
-- **Email Interno**: dev@tu-organizacion.com
-- **Slack**: #central-logger (canal interno)
+- **GitHub Issues**: https://github.com/sverguecio/central-logger-ci4/issues
 
 ---
 
@@ -259,8 +257,8 @@ Elige tu ruta según tu rol:
 
 ---
 
-**Central Logger CI4** v1.0.0  
-© 2026 Tu Organización  
+**Central Logger CI4** v1.1.0  
+© 2026 Sebastian Verguecio  
 Licencia: MIT
 
 [⬆ Volver arriba](#-central-logger-ci4---índice-de-documentación)
