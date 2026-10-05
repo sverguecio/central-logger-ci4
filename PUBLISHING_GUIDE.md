@@ -4,6 +4,53 @@ Esta guía te ayudará a publicar el paquete `central-logger-ci4` en tu reposito
 
 ---
 
+## 📦 Opción 0: Packagist público (recomendada)
+
+Es la vía que permite instalar el paquete con un único comando, sin declarar repositorios extra:
+
+```bash
+composer require sverguecio/central-logger-ci4:^1.1
+```
+
+### 1. Publicar el tag y el GitHub Release
+
+```bash
+git checkout main
+git pull origin main
+
+git tag -a v1.1.0 -m "Release v1.1.0 - Reintentos, cola local y contexto extendido"
+git push origin v1.1.0
+
+# Release de GitHub con las notas del CHANGELOG
+gh release create v1.1.0 --title "v1.1.0" --notes-from-tag
+```
+
+Packagist deriva las versiones de los tags de Git: sin un tag `v1.1.0`, la restricción `^1.1` no
+resuelve a nada.
+
+### 2. Registrar el paquete en Packagist
+
+1. Iniciar sesión en [packagist.org](https://packagist.org/login/github) con la cuenta de GitHub.
+2. Ir a [Submit](https://packagist.org/packages/submit) y pegar
+   `https://github.com/sverguecio/central-logger-ci4`.
+3. Confirmar. Packagist leerá `composer.json` y tomará el nombre `sverguecio/central-logger-ci4`
+   (debe coincidir con el `vendor` de la cuenta o Packagist pedirá confirmar la propiedad).
+
+### 3. Activar la actualización automática
+
+En **Packagist → el paquete → Settings** se obtiene el token de API. Con GitHub basta con instalar
+la [integración de Packagist](https://packagist.org/profile/) (`Enable GitHub Hook`) para que cada
+push de tag actualice el paquete. Si no, hay que pulsar **Update** manualmente tras cada release.
+
+### 4. Verificar
+
+```bash
+composer show sverguecio/central-logger-ci4 --all
+composer require sverguecio/central-logger-ci4:^1.1 --dry-run
+```
+
+---
+
 ## 📦 Opción 1: Repositorio Privado con VCS
 
 Si tu organización tiene un repositorio Git privado (GitHub, GitLab, Bitbucket):
@@ -23,7 +70,7 @@ git add .
 git commit -m "Initial release v1.0.0 - Central Logger CI4"
 
 # Agregar remote (reemplaza con tu URL)
-git remote add origin git@github.com:tu-organizacion/central-logger-ci4.git
+git remote add origin git@github.com:sverguecio/central-logger-ci4.git
 
 # Push inicial
 git push -u origin main
@@ -48,11 +95,11 @@ Edita el `composer.json` de cada aplicación y agrega:
     "repositories": [
         {
             "type": "vcs",
-            "url": "git@github.com:tu-organizacion/central-logger-ci4.git"
+            "url": "git@github.com:sverguecio/central-logger-ci4.git"
         }
     ],
     "require": {
-        "tu-organizacion/central-logger-ci4": "^1.0"
+        "sverguecio/central-logger-ci4": "^1.0"
     }
 }
 ```
@@ -80,19 +127,19 @@ cd satis
 
 ```json
 {
-    "name": "Tu Organización Private Packages",
-    "homepage": "https://packages.tu-organizacion.com",
+    "name": "Private Packages",
+    "homepage": "https://packages.example.com",
     "repositories": [
         {
             "type": "vcs",
-            "url": "git@github.com:tu-organizacion/central-logger-ci4.git"
+            "url": "git@github.com:sverguecio/central-logger-ci4.git"
         }
     ],
     "require-all": true,
     "archive": {
         "directory": "dist",
         "format": "tar",
-        "prefix-url": "https://packages.tu-organizacion.com"
+        "prefix-url": "https://packages.example.com"
     }
 }
 ```
@@ -112,11 +159,11 @@ En cada aplicación, edita `composer.json`:
     "repositories": [
         {
             "type": "composer",
-            "url": "https://packages.tu-organizacion.com"
+            "url": "https://packages.example.com"
         }
     ],
     "require": {
-        "tu-organizacion/central-logger-ci4": "^1.0"
+        "sverguecio/central-logger-ci4": "^1.0"
     }
 }
 ```
@@ -132,7 +179,7 @@ Para probar localmente antes de publicar:
 ```bash
 # Clonar o copiar el paquete
 cd /var/www/packages/
-git clone git@github.com:tu-organizacion/central-logger-ci4.git
+git clone git@github.com:sverguecio/central-logger-ci4.git
 ```
 
 ### En cada aplicación de prueba
@@ -148,7 +195,7 @@ Edita `composer.json`:
         }
     ],
     "require": {
-        "tu-organizacion/central-logger-ci4": "@dev"
+        "sverguecio/central-logger-ci4": "@dev"
     }
 }
 ```
@@ -196,7 +243,7 @@ git push origin v2.0.0
 
 ```bash
 cd /var/www/app-facturacion/
-composer update tu-organizacion/central-logger-ci4
+composer update sverguecio/central-logger-ci4
 
 # O para actualizar todo
 composer update
@@ -246,7 +293,7 @@ composer config -g gitlab-token.gitlab.com TU_TOKEN_GITLAB_AQUI
 
 ```bash
 # Generar SSH key si no tienes una
-ssh-keygen -t ed25519 -C "deploy@tu-organizacion.com"
+ssh-keygen -t ed25519 -C "deploy@example.com"
 
 # Agregar la clave pública a GitHub/GitLab
 cat ~/.ssh/id_ed25519.pub
@@ -256,16 +303,17 @@ cat ~/.ssh/id_ed25519.pub
 
 ## 📋 Checklist de Publicación
 
-Antes de publicar la versión 1.0.0:
+Antes de publicar la versión 1.1.0:
 
 - [ ] Verificar que todos los archivos están en el repositorio
 - [ ] Actualizar `CHANGELOG.md` con cambios de la versión
 - [ ] Verificar que `composer.json` tiene los datos correctos
+- [ ] Ejecutar `composer validate --strict` y `./validate.sh`
 - [ ] Probar instalación en una aplicación de prueba
-- [ ] Crear tag v1.0.0
+- [ ] Crear tag v1.1.0
 - [ ] Push del tag
-- [ ] Documentar en wiki interna de la organización
-- [ ] Notificar al equipo de desarrollo
+- [ ] Crear el GitHub Release con las notas del CHANGELOG
+- [ ] Registrar o actualizar el paquete en Packagist
 
 ---
 
@@ -342,7 +390,7 @@ echo "Tag: v$VERSION"
 echo "Mensaje: $MESSAGE"
 echo ""
 echo "📦 Ahora puedes instalar con:"
-echo "   composer require tu-organizacion/central-logger-ci4:^$VERSION"
+echo "   composer require sverguecio/central-logger-ci4:^$VERSION"
 ```
 
 Uso:
