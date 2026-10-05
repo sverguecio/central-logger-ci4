@@ -1,6 +1,6 @@
 # Central Logger CI4
 
-[![PHP Version](https://img.shields.io/badge/php-%3E%3D8.1-blue.svg)](https://php.net)
+[![PHP Version](https://img.shields.io/badge/php-%3E%3D8.0-blue.svg)](https://php.net)
 [![CodeIgniter](https://img.shields.io/badge/CodeIgniter-4.x-orange.svg)](https://codeigniter.com)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -48,6 +48,11 @@ composer require sverguecio/central-logger-ci4
   }
 }
 ```
+
+> **Nota sobre el namespace**: el paquete se llama `sverguecio/central-logger-ci4` pero su namespace
+> PSR-4 sigue siendo `TuOrganizacion\CentralLogger\`. Renombrarlo rompería el `use` de todo el código
+> que ya lo consume, así que el cambio queda reservado para la versión 2.0.0. Hasta entonces, importá
+> las clases con `TuOrganizacion\CentralLogger\...` tal como aparece en los ejemplos.
 
 ---
 
@@ -308,7 +313,7 @@ Para reportar bugs o feature requests, abrí un issue en GitHub.
 
 ## Compatibilidad
 
-- PHP: >= 8.1
+- PHP: >= 8.0
 - CodeIgniter 4.x
 - cURL requerido
 

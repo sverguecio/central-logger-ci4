@@ -4,12 +4,17 @@
     "type": "library",
     "license": "MIT",
     "keywords": ["codeigniter4", "logging", "centralized-logging", "error-tracking"],
+    "homepage": "https://github.com/sverguecio/central-logger-ci4",
     "authors": [
         {
-            "name": "Tu Organización",
-            "email": "dev@tu-organizacion.com"
+            "name": "Sebastian Verguecio",
+            "homepage": "https://github.com/sverguecio"
         }
     ],
+    "support": {
+        "issues": "https://github.com/sverguecio/central-logger-ci4/issues",
+        "source": "https://github.com/sverguecio/central-logger-ci4"
+    },
     "require": {
         "php": ">=8.0",
         "codeigniter4/framework": "^4.0"
